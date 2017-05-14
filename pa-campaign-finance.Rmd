@@ -1,0 +1,288 @@
+---
+title: "EDA - 2016 Presidential Campaign Contributions in Pennsylvania"
+output: html_notebook
+---
+
+# Introduction
+
+This is an exploration of the political contributions during the 2016 presidential race in Pennsylvania. This should provide an interesting look into one of the closest swing states in the general election. It also happens to be my home state.
+
+This exploratory data analysis will answer basic questions about the political contributions to campaigns in Pennsylvania. How much money was donated and to which candidates? From where in the state did the contributions come from? In what quantities and in what frequency were people most likely to donate? Which candidate and which political party got the most donations? And can we glean any insights into enthusiasm or participation levels?
+
+Here's the data source: http://fec.gov/disclosurep/pnational.do
+
+To begin, we'll look at the structure of the data.
+
+And here we go.
+
+```{r}
+
+# install necessary packages
+# install.packages('dplyr')
+# install.packages('zipcode')
+
+# project path
+setwd('/Users/cl/data-analyst/campaign-finance')
+getwd()
+
+# load libraries
+library(ggplot2)
+library(dplyr)
+library(zipcode)
+
+# read in data, tidy
+cf <- read.csv('P00000001-PA.csv', header=T, row.names=NULL)
+colnames(cf) <- c(colnames(cf)[-1],"blank")
+cf$blank <- NULL
+
+str(cf)
+```
+
+The data is a bit messy. There are 18 variables, mostly categorical. The only quantitative variable is contribution amount. We want to know who donated, who received the donation, how much, where, and when. The important variables for this are candidate id/candidate name, contribution amount, contributor name, contributor zip code, and contribution date. 
+
+We can possibly look at some of these other variables for some additional information, but with the amount of information, success seems doubtful. For example, consider contributor occupation. Perhaps there's some insight into what these donors do, but at 8496 different values in the data, things don't look too optimistic without some major categorizational effort.
+
+There's one major variable missing: party affiliation. This should be easy to deduce with some data wrangling. We'll create a map of candidates to their party and add it to the data.
+
+There are ~240K contributions total. Out of a state of ~13M, that doesn't seem like a lot. Is that an indicator of low enthusiasm levels in general? 
+
+```{r}
+summary(cf)
+```
+
+Here's a bird's eye view of the data. I'll give some first impressions before getting to the plots.
+
+First, the candidate ids match the candiate names exactly. This is good. It makes graphing this categorical variable easy. As for the data, Hillary Clinton got the most contributions by far, followed by Bernie Sanders. These two Democrats combined got ~6x as many contributions as the next candidate, Donald Trump, the Republican nominee. That's a bit surprising given the outcome of the vote in the state. Maybe not as Pennsylvania has gone Democrat since 1988 and was considered a part of Clinton's "blue wall". Finally, going off this stat, Sanders had some real ground support in the state. Oh what could have been.
+
+Next, contributor name. I'm not an expert in campaign finance laws, but it looks like people can contribute multiple times. 187 times in fact as the most prolific contributor did. It would be interesting to see if number of contributions has any correlation with party.
+
+As for contributor city and zip, no surprise here. Philadelphia leads and Pittsburgh's actually a pretty close second. The city and zip codes need cleaned up. I'll probably do that for the zip codes. I'm going to venture a guess and say the cities make the most donations.
+
+On to contributor employer and occupation, we find that one group leads the pack: retirees. That makes a lot of sense. Older people are more politically active. Also, what's going on with so many unemployed people donating? Students? This data needs some cleaning, but hopefully we can gain some insights.
+
+For the contribution date, I'd say there are probably two important periods in an election: the primaries and the general. Elections also contain critical moments, or crisis points. Perhaps a plot of contribution frequency by date could reveal peaks and valleys of contributions. Do supporters contribute more or less after a scandal or controversy? A look into when and how frequently people donated may give insights into levels of enthusiasm.
+
+And finally to the contribution amount, nothing too surprising. It looks like there's a few weird outliers, like a $93K refund and a $10k donation. Not sure what's going on there. It looks like the vast majority of contributions were under $100. An analysis of contribution amount by candidate and party should yield interesting insights.
+
+The rest of the variables contain minutiae that's too technical for this cursory analysis. So we'll ignore them.
+
+Now onwards to the plots.
+
+# Univariate Plots
+
+First, here's a histogram of the contribution frequency per candidate. The x axis is a mess, but we know who these bars are from the summary data. In descending order: Clinton, Sanders, Trump, Cruz, Carson, and Rubio.
+
+```{r, WARNING=FALSE, ERROR=FALSE}
+ggplot(cf, aes(x=cand_nm)) +
+  geom_histogram(stat="count") +
+  xlab("candidate") +
+  ylab("# contributions received")
+```
+
+Next, we'll look at the histogram the number of contributions by party. Right after we add a new variable: party.
+
+There are 24 candidates who received contributions. 5 ran as Democrats, 3 as third party, and the rest Republican.
+
+```{r, ECHO=TRUE}
+levels(cf$cand_nm)
+
+## create a new variable: party
+## give it values based on candidate
+## for simplicity's sake: "D", "R", and "I"
+
+cf$party <- ifelse(cf$cand_nm %in% c("Sanders, Bernard", "Clinton, Hillary Rodham", "O'Malley, Martin Joseph", "Webb, James Henry Jr.", "Lessig, Lawrence") , c("D"), c("R"))
+
+cf$party[cf$cand_nm %in% c("McMullin, Evan", "Johnson, Gary", "Stein, Jill")]  <- c("I")
+```
+
+```{r}
+ggplot(cf, aes(x=cf$party)) +
+  geom_histogram(stat="count") +
+  xlab("party") +
+  ylab("# contributions received")
+```
+
+Lets look at a histogram of contribution frequency by donor, after some quick data aggregation on the contributor name.
+
+```{r}
+head(cf$contbr_nm)
+
+contribution_freq <- cf %>%
+  group_by(contbr_nm) %>%
+  tally()
+
+ggplot(contribution_freq, aes(x=n)) +
+  geom_histogram() +
+  xlab("contribution frequency by donor") +
+  ylab("# contributions")
+
+rm(data)
+rm(contribution_freq)
+
+```
+
+For contributes by zip code, first we'll quickly cleanup the zip codes to be in the 5 digit format.
+
+```{r}
+cf$contbr_zip <- clean.zipcodes(cf$contbr_zip)
+cf$contbr_zip = substr(cf$contbr_zip, 1, 5)
+
+#head(cf)
+
+zip_contribution_freq <- cf %>%
+  group_by(contbr_zip) %>%
+  tally()
+
+```
+
+Contributions came from 1639 different zip codes in PA. There are 2174 total zip codes in the state. So ~500 zip codes did not contribute at all. Looking at the summary data, most zip codes did not have many contributions. Makes sense, I suppose. PA has some really rural areas.
+
+```{r}
+summary(zip_contribution_freq)
+```
+
+The plot of the contribution by zip code reveals a very positively skewed histogram. Most contributions are concentrated in certain zip codes.
+
+```{r}
+ggplot(zip_contribution_freq, aes(x=n)) +
+  geom_histogram(binwidth= 50)
+```
+
+Here's a peak into the top donating zip codes. And sure enough, all the top 10 are either in Pittsburgh or Philadelphia, Pennsylvania's two largest cities. In the top 25 there are some others, like 16801, which is Penn State and 17601, which is Lancaster, PA, a smaller city I'm not too familiar with. A few surburbs also make the list. It would be interesting to categorize zip codes into urban and rural, or some similiar categorization and analyse that. At 2k+ zip codes however, that may be beyond the scope of this project.
+
+
+```{r}
+head(zip_contribution_freq[order(-zip_contribution_freq$n), ], n=25)
+```
+
+Now we'll turn our attention to the contributor occupation and employer data. Again, I'll do some data aggregation to get a count of each type.
+
+```{r}
+contribution_job_freq <- cf %>%
+  group_by(contbr_occupation) %>%
+  tally()
+```
+
+Listing the top occupations, we see that that "RETIRED" leads the list, followed by "NOT EMPLOYED". Further down we see some tradtional professional jobs like attorney, professor, physician, consultant, manager, teacher, etc. There are also a few different occupations that all fall under the umbrella of software. I wonder who they donated to.
+
+```{r}
+head(contribution_job_freq[order(-contribution_job_freq$n), ], n=25)
+```
+
+Like before, the x axis is a jumbled mess. But we can roughly map which occupations the highest bars represent. Retirees tower over all the rest.
+
+```{r}
+subset(contribution_job_freq, contribution_job_freq$n > 1000) 
+
+ggplot(data=subset(contribution_job_freq, contribution_job_freq$n > 1000), aes(x=contbr_occupation, y=n)) +
+    geom_bar(stat="identity")
+```
+
+Moving on to look at contributions by date. Per usual, some data manipulation's needed. We'll format the dates to make sorting and comparision easier.
+
+```{r}
+
+cf$contribution_date <- as.Date(cf$contb_receipt_dt, format = "%d-%b-%y")
+
+```
+
+Here are some important dates for the 2016 presidential election:
+
+May 16 - PA Primaries
+July 18 - Republican Convention
+July 25 - Democratic Convention
+September 26 - First Debate
+October 9 - Second Debate
+October 19 - Third Debate
+November 7 - General Election
+
+These are the official dates for important events. Other things obviously happened during the campaign. Maybe the data will point those out without us going out of our way to find them.
+
+As for the data itself, the earliest contribution date is July 2014. That seems very early for the 2016 presidential race. These campaigns seem way too long. The median contribution date is June 2016, which makes sense as it's right after the primaries and just before the convention.
+
+```{r}
+summary(cf$contribution_date)
+```
+
+This plot shows the frequency of contributions by date. We'll use a bin width of 7 since that represents a week. Generally, contributions increased as the general election neared. There are a few notable peaks and valleys. Contributions peak right before primary, right after the conventions, and right before the general. Since this is all contributions, these are general trends. Below we'll take a more in depth look on a per party and per candidate basis.
+
+```{r}
+ggplot(cf, aes(x=cf$contribution_date)) +
+  geom_histogram(binwidth = 7)
+```
+
+This plot shows the contribution frequency per date after the PA primary.
+
+```{r}
+
+post_pa_primary <- subset(cf, cf$contribution_date > '2016-05-16')
+
+ggplot(post_pa_primary, aes(x=post_pa_primary$contribution_date)) +
+  geom_histogram(binwidth = 7)
+```
+
+And just for fun, here's the same plot for the period after the last debate.
+
+```{r}
+post_3rd_debate <- subset(cf, cf$contribution_date > '2016-10-19')
+
+ggplot(post_3rd_debate, aes(x=post_3rd_debate$contribution_date)) +
+  geom_histogram(binwidth = 1)
+```
+
+And finally, we switch to the amount per contribution. There are rules governing this and you can read about them here:
+
+http://www.fec.gov/pages/brochures/citizens.shtml
+
+```{r}
+#str(cf)
+summary(cf$contb_receipt_amt)
+```
+
+First things first, there are some obvious outliers. Not sure what's going on with a $93k refund, but I'm tempted to remove all refunds from the data. I'll keep the $10k contribution.
+```{r}
+contributions <- subset(cf, cf$contb_receipt_amt > 0)
+```
+
+With refunds removed, the summary statistics suggest that most contributions are small. The median is only $28. The mean's a bit higher, but still only $109.
+
+```{r}
+summary(contributions$contb_receipt_amt)
+```
+
+Unsurprisingly, the plot's very positively skwewed. There are lots and lots of small donations, and few big ones.
+
+```{r}
+ggplot(contributions, aes(x=contb_receipt_amt)) +
+  geom_histogram()
+```
+
+To get a better sense of the contribution amounts, we'll cut the contribution amounts into buckets. I chose $0-10, $10-25, $50-100, $100-1000, and $1000-10000.
+
+```{r}
+contribution_buckets <- cut(contributions$contb_receipt_amt, breaks=c(0,10,25,50,100,1000,10000))
+```
+
+With these buckets, we see that most people make small donations. The $100-$1000 bucket stands out as a decent sized donation that a sizable amount of people made.
+
+```{r}
+table(contribution_buckets)
+```
+
+# Univariate Analysis
+
+To summarize the above findings, most people contributed small amounts of money. Democrats overwhelmingly lead in political contributions received. And contributions followed a relatively predictable path in frequency based on the general milestones of an election.
+
+# Bivariate Plots
+
+Now we'll turn our attention to analysing relationships between the variables in our data. We'll look at things like contribution amount and contribution frequency per candidate, per party, per zip code, and per occupation. Hopefully some interesting insights emerge in exploring these relationships.
+
+# Bivariate Analysis
+
+# Multivariate Plots
+
+# Multivariate Analysis
+
+# Final Plots
+
+# Reflection
