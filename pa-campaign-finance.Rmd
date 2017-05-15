@@ -15,7 +15,7 @@ To begin, we'll look at the structure of the data.
 
 And here we go.
 
-```{r}
+```{r, echo=FALSE}
 
 # install necessary packages
 # install.packages('dplyr')
@@ -29,12 +29,15 @@ getwd()
 library(ggplot2)
 library(dplyr)
 library(zipcode)
+library(gridExtra)
 
 # read in data, tidy
 cf <- read.csv('P00000001-PA.csv', header=T, row.names=NULL)
 colnames(cf) <- c(colnames(cf)[-1],"blank")
 cf$blank <- NULL
+```
 
+```{r}
 str(cf)
 ```
 
@@ -178,7 +181,7 @@ ggplot(data=subset(contribution_job_freq, contribution_job_freq$n > 1000), aes(x
     geom_bar(stat="identity")
 ```
 
-Moving on to look at contributions by date. Per usual, some data manipulation's needed. We'll format the dates to make sorting and comparision easier.
+Moving on to look at contributions by date. Per usual, some data manipulation is needed. We'll format the dates to make sorting and comparision easier.
 
 ```{r}
 
@@ -273,16 +276,223 @@ table(contribution_buckets)
 
 To summarize the above findings, most people contributed small amounts of money. Democrats overwhelmingly lead in political contributions received. And contributions followed a relatively predictable path in frequency based on the general milestones of an election.
 
+New variables: party.
+
 # Bivariate Plots
 
 Now we'll turn our attention to analysing relationships between the variables in our data. We'll look at things like contribution amount and contribution frequency per candidate, per party, per zip code, and per occupation. Hopefully some interesting insights emerge in exploring these relationships.
 
+Our first plot in this section will show the contributions raised by party. The Democrats raised $15,000,000 and the Republicans raised $10,000,000. This gap is a bit closer than the # of contributions graphed above, so it seems Republicans make bigger donations.
+
+```{r}
+ggplot(contributions, aes(x=party, y=contb_receipt_amt)) +
+  geom_bar(stat="identity")
+```
+
+Next we'll look at a boxplot of individual contributions. We'll limit the contributions to between 0 and 2700, which is the upper limit for individuals per the rules. To make it readable, we'll add a log10 scale for the y axis.
+
+Nothing too surprising here. Republicans have higher donations in general. The third party candidates have the highest of the three.
+
+```{r}
+ggplot(contributions, aes(x=party, y=contb_receipt_amt)) +
+  geom_boxplot() +
+  coord_cartesian(ylim = c(1, 2700)) +
+  scale_y_log10()
+```
+
+For amount raised by candidates, we'll do some data aggregation first. And then plot the results.
+
+The first plot will be the usual jumbled mess of 24 candidates, just to get a sense of things overall. The sorted table of total contribution amounts will shed light on which bars belong to which.
+
+Clinton received the most money in contributions by far. She raised 3x as the next candidate, Trump. Sander did pretty well considering he only lasted till the primaries.
+
+```{r}
+contribution_amt_per_candidate <- contributions %>%
+  group_by(cand_nm) %>%
+  summarize(sum = sum(contb_receipt_amt))
+```
+
+```{r}
+head(contribution_amt_per_candidate[order(-contribution_amt_per_candidate$sum),], n=24)
+```
+
+
+```{r}
+ggplot(contribution_amt_per_candidate, aes(x=cand_nm, y=sum)) +
+  geom_bar(stat="identity")
+```
+
+Next, we'll look at the boxplots of the contributions amounts made to the top candidates. There will be three groups: general election candidates, primary candidate Democrats, and some primary candidate Republicans.
+
+```{r}
+p1 <- ggplot(subset(contributions, cand_nm == 'Clinton, Hillary Rodham' | cand_nm == 'Trump, Donald J.'), aes(x=cand_nm, y=contb_receipt_amt)) +
+  geom_boxplot() +
+  scale_y_log10()
+
+p2 <- ggplot(subset(contributions, party == 'D' & cand_nm != 'Clinton, Hillary Rodham'), aes(x=cand_nm, y=contb_receipt_amt)) +
+  geom_boxplot() +
+  scale_y_log10()
+
+p3 <- ggplot(subset(contributions, cand_nm == "Cruz, Rafael Edward 'Ted'" | cand_nm == "Rubio, Marco" | cand_nm == "Carson, Benjamin S." | cand_nm == "Bush, Jeb"), aes(x=cand_nm, y=contb_receipt_amt)) +
+  geom_boxplot() +
+  scale_y_log10()
+
+#grid.arrange(p1, p2, p3, ncol=1)
+
+```
+
+```{r}
+p1
+```
+
+```{r}
+p2
+```
+
+```{r}
+p3
+```
+
+There are a few interesting takeaways from these boxplots. Keep in mind the y axis is log10 scaled. 
+
+For a "populist" candidate, Trump had less spread and higher mean contribution amounts than Clinton. He's still a Republican it seems.
+
+For the Democrats, Sanders had smaller contributions with a lot more variation. Lessig and O'Malley had more per contribution than some of the top Republicans. I don't think they had much support, so maybe those that did probably tended to be more enthusiastic.
+
+For the Republicans, Jeb had the support of those who make higher contributions. His mean contribution amount was ~$900. Compare that to Sander's mean contribution amount: $27. Carson and Cruz had really similar amounts per contribution, which suggests that they share a base.
+
 # Bivariate Analysis
 
+
+
+
 # Multivariate Plots
+
+Next, we'll switch to looking at contribution data per occupation. Above we saw that retirees, unemployed, and various professional careers made the most frequent contributions. Here we'll hopefully see how much and to who they donated.
+
+To accomplish this, we'll first do some data wrangling to get two dataframes: contribution total amount by occupation and party, and contribution total amount by occupation and candidate.
+
+```{r}
+
+contbr_by_occupation_party <- contributions %>%
+  group_by(contbr_occupation, party) %>%
+  summarize(total = sum(contb_receipt_amt))
+
+contbr_by_occupation_candidate <- contributions %>%
+  group_by(contbr_occupation, cand_nm) %>%
+  summarize(total = sum(contb_receipt_amt))
+
+```
+
+There's almost an endless amount of analysis we could do here. First, we'll look at which occupations donated the most and for which party.
+
+```{r}
+head(arrange(contbr_by_occupation_party, desc(total)), n=50)
+```
+
+These are interesting. Retired folks donating to both parties lead the list. The unemployed donate a lot of money to Democrats. Attorneys, physicians, lawyers, consultants, and professors donating to Dems round out the top of the list. Not until you get down to the last 10 spots do you groups donating to Republicans: upper level management. Lastly, what's up with Homemakers donating so much money to candidates? Seems like a good way to double up on donations.
+
+Next, we'll focus on the top two groups: the retired and the unemployed.
+
+```{r}
+head(arrange(subset(contbr_by_occupation_party, contbr_by_occupation$contbr_occupation == 'RETIRED'), desc(total)))
+```
+
+
+```{r}
+head(arrange(subset(contbr_by_occupation_candidate, contbr_by_occupation_candidate$contbr_occupation == 'RETIRED'), desc(total)), n=24)
+```
+
+I'm actually a bit surprised by the numbers for the contribution amounts for retired folk. By party, things are pretty much even. Clinton did much better than Trump, raising 2x as much, though. However, the Republican field had many more candidates, which diluted contributions. It's interesting how much less money Sanders received from this group as well.
+
+```{r}
+head(arrange(subset(contbr_by_occupation_candidate, contbr_by_occupation_candidate$contbr_occupation == 'NOT EMPLOYED'), desc(total)), n=5)
+```
+
+Sanders crushed in contributions received from the unemployed. These may also be students (but maybe not as students have their own category).
+
+Here's a plot of the top professions with contributions amounts by party. Dems really rake in the contributions from these professional careers. It would be interesting to see if this is a national trend or something unique to Pennsylvania. I also added students because why not.
+
+```{r}
+ggplot(subset(contbr_by_occupation_party, contbr_by_occupation_party$contbr_occupation == 'PHYSICIAN' | contbr_by_occupation_party$contbr_occupation == 'ATTORNEY' | contbr_by_occupation_party$contbr_occupation == 'PROFESSOR' | contbr_by_occupation_party$contbr_occupation == 'TEACHER' | contbr_by_occupation_party$contbr_occupation == 'STUDENT'), aes(x=contbr_occupation, y=total, color=party)) +
+  geom_bar(stat='identity', aes(fill=party)) +
+  scale_colour_manual(values=c('#000000','#000000','#000000'))+
+  scale_fill_manual(values=c("#56B4E9", "#E69F00", "#ff0000"))
+```
+
+Next, lets take a look at donation frequency by date for the parties and candidates.
+
+```{r}
+ggplot(contributions, aes(contribution_date, color=party)) +
+  geom_freqpoly(binwidth = 7) +
+  scale_colour_manual(values=c("#56B4E9", "#E69F00", "#ff0000"))
+```
+
+Wow. Republican donations really took a dive after the convention, whereas the Democrats kept going strong all the way to election night.
+
+```{r}
+ggplot(subset(contributions, contributions$cand_nm == 'Clinton, Hillary Rodham' | contributions$cand_nm == 'Trump, Donald J.'), aes(contribution_date, color=cand_nm)) +
+  geom_freqpoly(binwidth = 7) +
+  scale_colour_manual(values=c("#56B4E9", "#ff0000"))
+```
+
+The same trend occurs when we limit things to just Clinton and Trump. Trump's contributions really took a dip after the convention, whereas Clinton's kept going strong all the way to the election. 
+
+What's really striking is Trump barely has any activity until the Republican convention. Clinton has donations flowing in even during the primary.
 
 # Multivariate Analysis
 
 # Final Plots
 
+## Plot 1 - Contribution frequency over the span of the election
+
+I chose this plot because it seems like the best example of measuring enthusiasm. In my opinion, contribution frequency is a better measure of enthusiasm than contribution amount. This plot suggests that Clinton had an overwhelming amount of enthusiasm as she had the most contributions at basically every point. And these contributions seemed to keep flowing until the election. Trump's contributions peaked right around the conventions and then plumetted. Using this plot, it's astonishing that he narrowly pulled out a victory in the state. 
+
+```{r}
+ggplot(subset(contributions, contributions$cand_nm == 'Clinton, Hillary Rodham' | contributions$cand_nm == 'Trump, Donald J.'), aes(contribution_date, color=cand_nm)) +
+  geom_freqpoly(binwidth = 7) +
+  scale_colour_manual(values=c("#56B4E9", "#ff0000")) +
+  xlab("date") +
+  ylab("# contributions received") +
+  ggtitle("Contribution frequency by date for Hillary Clinton and Donald Trump")
+```
+
+## Plot 2 - Donations per party by occupation
+
+I found the donations by occupation really interesting. We trust these professionals to perform vital functions in our society, so it's intersting to see who they support politically. It seems that the Democrats received a lot more money from these groups than Republicans.
+
+As for retirees, it's interesting to see just how much more money they contribute. Granted, there probably are a bunch more retirees than actively practicing attorneys or lawyers, and we're not really sure which professions these retirees had in their working years. However, it is still interesting how much they give. What's also striking is that they seem to donate an equal amount of money to Democrats and Republicans alike. This does suggest that retirees are more politically active than other sections of the population.
+
+
+```{r}
+ggplot(subset(contbr_by_occupation_party, contbr_by_occupation_party$contbr_occupation == 'PHYSICIAN' | contbr_by_occupation_party$contbr_occupation == 'ATTORNEY' | contbr_by_occupation_party$contbr_occupation == 'PROFESSOR' | contbr_by_occupation_party$contbr_occupation == 'TEACHER' | contbr_by_occupation_party$contbr_occupation == 'RETIRED' | contbr_by_occupation_party$contbr_occupation == 'PRESIDENT'), aes(x=contbr_occupation, y=total, color=party)) +
+  geom_bar(stat='identity', aes(fill=party)) +
+  scale_colour_manual(values=c('#000000','#000000','#000000')) +
+  scale_fill_manual(values=c("#56B4E9", "#E69F00", "#ff0000")) +
+  ylab("$ contributed") +
+  xlab("occupation (including retirees and unemployed)") +
+  theme(text = element_text(size=10),
+        axis.text.x = element_text(angle=90, hjust=1)) +
+  ggtitle("Political contribution amounts by most contributing professions and retirees to each party during 2016 presidential campaign")
+```
+
+## Plot 3 - Boxplot of $ amounts per contribution for top candidates
+
+This boxplot shows information regarding the $ amount per contribution for the top three candidates: Clinton, Sanders, and Trump.
+
+```{r}
+ggplot(subset(contributions, contributions$cand_nm == 'Clinton, Hillary Rodham' | contributions$cand_nm == 'Sanders, Bernard' | contributions$cand_nm == 'Trump, Donald J.'), aes(x=cand_nm, y=contb_receipt_amt)) +
+  geom_boxplot() +
+  coord_cartesian(ylim = c(1, 2700)) +
+  scale_y_log10() +
+  xlab("candidate") +
+  ylab("contribution amount in dollars") +
+  ggtitle("Boxplot of $ per contribution for top 3 candidates in terms of contribution amount")
+```
+
+
 # Reflection
+
+This data has only one quantative variable and a bunch of qualitative variables. So naturally most insights involve the amount of $ contributed to certain groups. The frequency of contributions from donors is a way to gauge enthusiasm.
+
+I unfortunately did not get to analysing donations from certain locations in the state. It must be possible to produce some sort of map, maybe a heatmap, of contributions by zip code. This would be a great visual of enthusiasm for either parties or candidates in various regions of the state. If I were to further this investigation, I would certainly add this.
