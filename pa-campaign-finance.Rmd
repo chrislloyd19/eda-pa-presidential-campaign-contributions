@@ -5,9 +5,9 @@ output: html_notebook
 
 # Introduction
 
-This is an exploration of the political contributions during the 2016 presidential race in Pennsylvania. This should provide an interesting look into one of the closest swing states in the general election. It also happens to be my home state.
+This is an exploration of the political contributions made during the 2016 presidential race in Pennsylvania. This should provide an interesting look into one of the biggest surprises in the general election. It also happens to be my home state.
 
-This exploratory data analysis will answer basic questions about the political contributions to campaigns in Pennsylvania. How much money was donated and to which candidates? From where in the state did the contributions come from? In what quantities and in what frequency were people most likely to donate? Which candidate and which political party got the most donations? And can we glean any insights into enthusiasm or participation levels?
+This exploratory data analysis will answer basic questions about the political contributions to campaigns in Pennsylvania. How much money was donated and to which candidates? In what quantities and in what frequency were people most likely to donate? From where in the state did the contributions come from?  Which candidate and which political party got the most donations? And can we glean any insights into enthusiasm or participation levels?
 
 Here's the data source: http://fec.gov/disclosurep/pnational.do
 
@@ -29,7 +29,7 @@ library(dplyr)
 library(zipcode)
 library(gridExtra)
 
-# read in data, tidy
+# read in data, remove last column
 cf <- read.csv('P00000001-PA.csv', header=T, row.names=NULL)
 colnames(cf) <- c(colnames(cf)[-1],"blank")
 cf$blank <- NULL
@@ -39,7 +39,7 @@ cf$blank <- NULL
 str(cf)
 ```
 
-The data is a bit messy. There are 18 variables, mostly categorical. The only quantitative variable is contribution amount. We want to know who donated, who received the donation, how much, where, and when. The important variables for this are candidate id/candidate name, contribution amount, contributor name, contributor zip code, and contribution date. 
+The data is a bit messy. There are 18 variables, mostly categorical. The only quantitative variable is contribution amount. We want to know who donated, who received the donation, how much, where, and when. The important variables for this are candidate id/candidate name, contribution amount, contributor name, contributor zip code, contributior occupation, and contribution date. 
 
 We can possibly look at some of these other variables for some additional information, but with the amount of information, success seems doubtful. For example, consider contributor occupation. Perhaps there's some insight into what these donors do, but at 8496 different values in the data, things don't look too optimistic without some major categorizational effort.
 
@@ -51,19 +51,19 @@ There are ~240K contributions total. Out of a state of ~13M, that doesn't seem l
 summary(cf)
 ```
 
-Here's a bird's eye view of the data. I'll give some first impressions before getting to the plots.
+Here's a bird's eye view of the data. I'll give some first impressions before getting to the plots. These are the main variables of interest.
 
-First, the candidate ids match the candiate names exactly. This is good. It makes graphing this categorical variable easy. As for the data, Hillary Clinton got the most contributions by far, followed by Bernie Sanders. These two Democrats combined got ~6x as many contributions as the next candidate, Donald Trump, the Republican nominee. That's a bit surprising given the outcome of the vote in the state. Maybe not as Pennsylvania has gone Democrat since 1988 and was considered a part of Clinton's "blue wall". Finally, going off this stat, Sanders had some real ground support in the state. Oh what could have been.
+1. cand_n, cand_id. First, the candidate ids match the candiate names exactly. This is good. It makes graphing this categorical variable easy. As for the data, Hillary Clinton got the most contributions by far, followed by Bernie Sanders. These two Democrats combined got ~6x as many contributions as the next candidate, Donald Trump, the Republican nominee. That's a bit surprising given the outcome of the vote in the state. Maybe not as Pennsylvania has gone Democrat since 1988 and was considered a part of Clinton's "blue wall". Finally, going off this stat, Sanders had some real ground support in the state. Oh what could have been.
 
-Next, contributor name. I'm not an expert in campaign finance laws, but it looks like people can contribute multiple times. 187 times in fact as the most prolific contributor did. It would be interesting to see if number of contributions has any correlation with party.
+2. contributor name. I'm not an expert in campaign finance laws, but it looks like people can contribute multiple times. 187 times in fact as the most prolific contributor did. Contribution frequency seems like a possible candidate for measuring enthusiasm levels.
 
-As for contributor city and zip, no surprise here. Philadelphia leads and Pittsburgh's actually a pretty close second. The city and zip codes need cleaned up. I'll probably do that for the zip codes. I'm going to venture a guess and say the cities make the most donations.
+3. contributor city, zip. No surprise here. Philadelphia leads and Pittsburgh's actually a pretty close second. The city and zip codes need cleaned up. I'll probably do that for the zip codes. I'm going to venture a guess and say the cities make the most donations.
 
-On to contributor employer and occupation, we find that one group leads the pack: retirees. That makes a lot of sense. Older people are more politically active. Also, what's going on with so many unemployed people donating? Students? This data needs some cleaning, but hopefully we can gain some insights.
+4. contributor employer and occupation. We find that one group leads the pack: retirees. That makes a lot of sense. Older people are more politically active. Also, what's going on with so many unemployed people donating? Students? This data needs some cleaning, but hopefully we can gain some insights.
 
-For the contribution date, I'd say there are probably two important periods in an election: the primaries and the general. Elections also contain critical moments, or crisis points. Perhaps a plot of contribution frequency by date could reveal peaks and valleys of contributions. Do supporters contribute more or less after a scandal or controversy? A look into when and how frequently people donated may give insights into levels of enthusiasm.
+5. contribution date. I'd say there are probably two important periods in an election: the primaries and the general. Elections also contain critical moments, or crisis points. Perhaps a plot of contribution frequency by date could reveal peaks and valleys of contributions. Do supporters contribute more or less after a scandal or controversy? A look into when and how frequently people donated may give insights into levels of enthusiasm.
 
-And finally to the contribution amount, nothing too surprising. It looks like there's a few weird outliers, like a $93K refund and a $10k donation. Not sure what's going on there. It looks like the vast majority of contributions were under $100. An analysis of contribution amount by candidate and party should yield interesting insights.
+6. contribution amount. Nothing too surprising. It looks like there's a few weird outliers, like a $93K refund and a $10k donation. Not sure what's going on there. It looks like the vast majority of contributions were under $100. An analysis of contribution amount by candidate and party should yield interesting insights.
 
 The rest of the variables contain minutiae that's too technical for this cursory analysis. So we'll ignore them.
 
@@ -71,7 +71,7 @@ Now onwards to the plots.
 
 # Univariate Plots
 
-First, here's a histogram of the contribution frequency per candidate. The x axis is a mess, but we know who these bars are from the summary data. In descending order: Clinton, Sanders, Trump, Cruz, Carson, and Rubio.
+First, here's a histogram of the contribution frequency per candidate. The x axis is a mess, but we know who these bars are from the summary data. Here are the big bars in descending order: Clinton, Sanders, Trump, Cruz, Carson, and Rubio.
 
 ```{r, WARNING=FALSE, ERROR=FALSE, echo=FALSE}
 ggplot(cf, aes(x=cand_nm)) +
@@ -103,6 +103,8 @@ ggplot(cf, aes(x=cf$party)) +
   ylab("# contributions received")
 ```
 
+The Democrats raised more money, even with fewer candidates.
+
 Lets look at a histogram of contribution frequency by donor, after some quick data aggregation on the contributor name.
 
 ```{r, echo=FALSE}
@@ -121,6 +123,8 @@ rm(data)
 rm(contribution_freq)
 
 ```
+
+This shows us that the vast majority of contributors only contributor a few times.
 
 For contributes by zip code, first we'll quickly cleanup the zip codes to be in the 5 digit format.
 
@@ -190,11 +194,17 @@ cf$contribution_date <- as.Date(cf$contb_receipt_dt, format = "%d-%b-%y")
 Here were some important dates for the 2016 presidential election:
 
 May 16 - PA Primaries
+
 July 18 - Republican Convention
+
 July 25 - Democratic Convention
+
 September 26 - First Debate
+
 October 9 - Second Debate
+
 October 19 - Third Debate
+
 November 7 - General Election
 
 These are the official dates for important events. Other things obviously happened during the campaign. Maybe the data will point those out without us going out of our way to find them.
@@ -447,7 +457,7 @@ In sum, several things stood out. Retirees make the most donations to both parti
 
 ## Plot 1 - Contribution frequency over the span of the election
 
-I chose this plot because it seems like the best example of measuring enthusiasm. In my opinion, contribution frequency is a better measure of enthusiasm than contribution amount. This plot suggests that Clinton had an overwhelming amount of enthusiasm as she had the most contributions at basically every point. And these contributions seemed to keep flowing until the election. Trump's contributions peaked right around the conventions and then plumetted. He really did not have much going for him in terms of donations. It's astonishing that he narrowly pulled out a victory in the state.
+I chose this plot because it seems like the best example of measuring enthusiasm. In my opinion, contribution frequency is a better measure of enthusiasm than contribution amount. This plot suggests that Clinton had an overwhelming amount of enthusiasm as she had the most contributions at basically every point. And these contributions seemed to keep flowing until the election. Trump's contributions peaked right around the conventions and then plumetted. He had a few scandals and did not perform very well in the debates, so his declining contributions make sense. He really did not have much going for him in terms of contributions other than right around the conventions when his level of enthusiasm matched Clinton's. It's astonishing that he narrowly pulled out a victory in the state.
 
 ```{r, echo=FALSE}
 ggplot(subset(contributions, contributions$cand_nm == 'Clinton, Hillary Rodham' | contributions$cand_nm == 'Trump, Donald J.'), aes(contribution_date, color=cand_nm)) +
@@ -479,7 +489,7 @@ ggplot(subset(contbr_by_occupation_party, contbr_by_occupation_party$contbr_occu
 
 ## Plot 3 - Contribution frequency by date between start of election cycle and Democratic primary for Bernie Sanders and Hillary Clinton
 
-This is good stuff. If we accept this idea of contribution frequency as a measure of enthusiasm, then Pennsylvania definitely felt the Bern until about the PA primary. Sanders' contribution frequency handily leads Clinton until right around the PA primary. With that said, Clinton won the primary 56% - 44% (see https://en.wikipedia.org/wiki/Pennsylvania_Democratic_primary,_2016). That's a solid win for her. About 1.6M people voted in the Democratic primary, and 2/3 of the ~240k donations went to Democrats. So maybe Benie only had the support of a dedicated minority. That raises an interesting question though. Who contributes to political campaigns and who actually votes?
+This is good stuff. If we accept this idea of contribution frequency as a measure of enthusiasm, then Pennsylvania definitely felt the Bern until about the PA primary. Sanders handily leads in contribution frequency against Clinton until right around the PA primary. With that said, Clinton won the primary 56% - 44% (see https://en.wikipedia.org/wiki/Pennsylvania_Democratic_primary,_2016). That's a solid win for her. About 1.6M people voted in the Democratic primary, and 2/3 of the ~240k donations went to Democrats. So maybe Benie only had the support of a dedicated minority. That raises an interesting question though. Who contributes to political campaigns and who actually votes?
 
 ```{r, echo=FALSE}
 ggplot(subset(contributions, contributions$cand_nm == 'Sanders, Bernard' | contributions$cand_nm == 'Clinton, Hillary Rodham' & contribution_date < '2016-07-25'), aes(contribution_date, color=cand_nm)) +
@@ -487,7 +497,7 @@ ggplot(subset(contributions, contributions$cand_nm == 'Sanders, Bernard' | contr
   scale_colour_manual(values=c("#ff0000", "#56B4E9")) +
   xlab("date") +
   ylab("# contributions received") +
-  ggtitle("Contribution frequency by date for Hillary Clinton and \nBernie Sanders")
+  ggtitle("Contribution frequency by date for Hillary Clinton and \nBernie Sanders up until DNC convention")
 ```
 
 
@@ -499,14 +509,18 @@ I made several decisions in working with the data. For most of the plots, I omit
 
 I did a fair amount of data wrangling throughout the investigation. The dplyr package came in handy time and time again in aggregating data, e.g. aggregating contribution amounts by party and occupation. All of my plots used the ggplot2 package, as I'm most familiar with using it. These packages are fast and easy to use, so no difficulties in utilizing them. I also added one variable to the main data set: party. This made aggregating data by party easier. I also transformed the dates into a sortable format, i.e. ("YYYY-MM-DD"), which made things easier.
 
-As for difficulties, I did not face many. Luckily this data set only had ~250k rows, which made it very manageable. I did run into some performance issues initially in plotting things. Some of the early plotting attempts took forever to produce, until I started aggregating data and plotting that. This decoupled the plotting function with aggregating the data, speeding things up considerably. I learned that transforming data before plotting it is a smart way to do EDA.
+As for difficulties, I did not face many. Luckily this data set only had ~250k rows, which made it very manageable. I did run into some performance issues initially in plotting things. Some of the early plotting attempts took forever to produce, until I started aggregating data and plotting that. This decoupled the plotting with aggregating the data, speeding things up considerably. I learned that transforming data before plotting it is a smart way to do EDA.
 
 I unfortunately did not get to analysing contributions from specific locations in the state. It must be possible to produce some sort of map, maybe a heatmap, of contributions by zip code. This would be a great visual of enthusiasm for either parties or candidates in various regions of the state. If I were to further this investigation, I would certainly add this.
 
-I also did not do any sort of predictive modeling. Once I have more experience, I would definitely like to revisit this data and apply some models. It would be interesting to predict things like candidate choice based on contribution amount, zip code, or occupation.
+I also did not do any sort of predictive modeling. Once I have more experience with this, I would definitely like to revisit this data and apply some models. It would be interesting to predict things like candidate choice based on contribution amount, zip code, or occupation. Political campaigns could use models like this to target certain voters for fundraising, or get out the vote efforts.
 
 # Sources
 
 http://www.datacarpentry.org/dc_zurich/R-ecology/04-dplyr.html
 
 https://en.wikipedia.org/wiki/Pennsylvania_Democratic_primary,_2016
+
+http://www.270towin.com/states/Pennsylvania
+
+http://www.fec.gov/pages/brochures/citizens.shtml
