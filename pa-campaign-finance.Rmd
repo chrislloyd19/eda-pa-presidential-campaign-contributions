@@ -53,7 +53,7 @@ summary(cf)
 
 Here's a bird's eye view of the data. I'll give some first impressions before getting to the plots. These are the main variables of interest.
 
-1. cand_n, cand_id. First, the candidate ids match the candiate names exactly. This is good. It makes graphing this categorical variable easy. As for the data, Hillary Clinton got the most contributions by far, followed by Bernie Sanders. These two Democrats combined got ~6x as many contributions as the next candidate, Donald Trump, the Republican nominee. That's a bit surprising given the outcome of the vote in the state. Maybe not as Pennsylvania has gone Democrat since 1988 and was considered a part of Clinton's "blue wall". Finally, going off this stat, Sanders had some real ground support in the state. Oh what could have been.
+1. cand_n, cand_id. First, the candidate ids match the candiate names exactly. This is good. It makes graphing this categorical variable easy. As for the data, Hillary Clinton got the most contributions by far, followed by Bernie Sanders. These two Democrats combined got ~6x as many contributions as the next candidate, Donald Trump, the Republican nominee. That's a bit surprising given the outcome of the vote in the state. Maybe not as Pennsylvania has gone Democrat since 1988 and was considered a part of Clinton's "blue wall". Finally, going off this stat, Sanders had some real ground support in the state.
 
 2. contributor name. I'm not an expert in campaign finance laws, but it looks like people can contribute multiple times. 187 times in fact as the most prolific contributor did. Contribution frequency seems like a possible candidate for measuring enthusiasm levels.
 
@@ -609,7 +609,7 @@ ggplot(subset(contbr_by_occupation_party,
 
 ## Plot 3 - Contribution frequency by date between start of election cycle and Democratic primary for Bernie Sanders and Hillary Clinton
 
-This is good stuff. If we accept this idea of contribution frequency as a measure of enthusiasm, then Pennsylvania definitely felt the Bern until about the PA primary. Sanders leads in contribution frequency against Clinton until right around the PA primary. With that said, Clinton won the primary 56% - 44% (see https://en.wikipedia.org/wiki/Pennsylvania_Democratic_primary,_2016). That's a solid win for her. About 1.6M people voted in the Democratic primary, and 2/3 of the ~240k donations went to Democrats. So maybe Benie only had the support of a dedicated minority. That raises an interesting question though. Who contributes to political campaigns and who actually votes?
+This is good stuff. If we accept this idea of contribution frequency as a measure of enthusiasm, then Pennsylvania seems to have felt the Bern until about the PA primary. Sanders leads in contribution frequency against Clinton until right around the PA primary. With that said, Clinton won the primary 56% - 44% (see https://en.wikipedia.org/wiki/Pennsylvania_Democratic_primary,_2016). That's a solid win for her. About 1.6M people voted in the Democratic primary, and 2/3 of the ~240k donations went to Democrats. So maybe Benie only had the support of a dedicated minority. That raises an interesting question though. Who contributes to political campaigns and who actually votes?
 
 ```{r, echo=FALSE}
 ggplot(subset(contributions, 
